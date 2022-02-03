@@ -62,6 +62,43 @@ namespace Application_Security_Assignment
             }
         }
 
+        protected void logFailAttempt(int type)
+        {
+            string logId = Guid.NewGuid().ToString();
+            using (var connection = new SqlConnection(MYDBConnectionString))
+            {
+                var query = "INSERT INTO Logs VALUES(@logId, @Email, @Timestamp, @Type, @IpAddress)";
+                SqlCommand command = new SqlCommand(query, connection);
+                command.Parameters.AddWithValue("@logId", logId);
+                command.Parameters.AddWithValue("@Email", HttpUtility.HtmlEncode(Session["Email"]).ToLower().Trim());
+                command.Parameters.AddWithValue("@Timestamp", DateTime.Now);
+                command.Parameters.AddWithValue("@Type", type);
+                command.Parameters.AddWithValue("@IpAddress", GetIPAddress());
+
+                try
+                {
+                    command.Connection.Open();
+                    command.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(ex.ToString());
+                }
+                finally
+                {
+                    connection.Close();
+                }
+            }
+        }
+        protected string GetIPAddress()
+        {
+            string ip = System.Web.HttpContext.Current.Request.ServerVariables["HTTP_X_FORWARDED_FOR"];
+            if (string.IsNullOrEmpty(ip))
+            {
+                ip = System.Web.HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
+            }
+            return ip;
+        }
         protected string checkLoginCode() {
             string h = null;
             SqlConnection connection = new SqlConnection(MYDBConnectionString);
@@ -208,6 +245,7 @@ namespace Application_Security_Assignment
                 }
             }
             else {
+                logFailAttempt(2);
                 retireLoginCode();
                 generateLoginCode();
                 loginCode = checkLoginCode();

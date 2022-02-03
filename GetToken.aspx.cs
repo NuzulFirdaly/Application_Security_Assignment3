@@ -45,13 +45,50 @@ namespace Application_Security_Assignment
             }
 
         }
+        protected void logFailAttempt(int type)
+        {
+            string logId = Guid.NewGuid().ToString();
+            using (var connection = new SqlConnection(MYDBConnectionString))
+            {
+                var query = "INSERT INTO Logs VALUES(@logId, @Email, @Timestamp, @Type, @IpAddress)";
+                SqlCommand command = new SqlCommand(query, connection);
+                command.Parameters.AddWithValue("@logId", logId);
+                command.Parameters.AddWithValue("@Email", HttpUtility.HtmlEncode(email_TB.Text).ToLower().Trim());
+                command.Parameters.AddWithValue("@Timestamp", DateTime.Now);
+                command.Parameters.AddWithValue("@Type", type);
+                command.Parameters.AddWithValue("@IpAddress", GetIPAddress());
+
+                try
+                {
+                    command.Connection.Open();
+                    command.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(ex.ToString());
+                }
+                finally
+                {
+                    connection.Close();
+                }
+            }
+        }
+        protected string GetIPAddress()
+        {
+            string ip = System.Web.HttpContext.Current.Request.ServerVariables["HTTP_X_FORWARDED_FOR"];
+            if (string.IsNullOrEmpty(ip))
+            {
+                ip = System.Web.HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
+            }
+            return ip;
+        }
         protected string checkLoginCode()
         {
             string h = null;
             SqlConnection connection = new SqlConnection(MYDBConnectionString);
             string sql = "select * FROM Users WHERE Email=@Email";
             SqlCommand command = new SqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@Email", email_TB.Text);
+            command.Parameters.AddWithValue("@Email", HttpUtility.HtmlEncode(email_TB.Text.ToLower()));
             try
             {
                 connection.Open();
@@ -224,6 +261,7 @@ namespace Application_Security_Assignment
                 }
                 else
                 {
+                    logFailAttempt(3);
                     retireLoginCode();
                     generateLoginCode();
                     loginCode = checkLoginCode();
@@ -234,6 +272,7 @@ namespace Application_Security_Assignment
             }
             else
             {
+                logFailAttempt(3);
                 errroLbl.Text = "Token Code is invalid, if email exists, we have generated a new one, please check again";
                 errroLbl.ForeColor = System.Drawing.Color.Red;
             }
@@ -243,7 +282,7 @@ namespace Application_Security_Assignment
         protected void resend_BTN_Click(object sender, EventArgs e)
         {
             sendLoginVerificationEmail(email_TB.Text.ToString());
-
+            logFailAttempt(7);
         }
     }
 }

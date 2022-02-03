@@ -103,6 +103,43 @@ namespace Application_Security_Assignment
             finally { connection.Close(); }
             return s;
         }
+        protected void logFailAttempt(int type)
+        {
+            string logId = Guid.NewGuid().ToString();
+            using (var connection = new SqlConnection(MYDBConnectionString))
+            {
+                var query = "INSERT INTO Logs VALUES(@logId, @Email, @Timestamp, @Type, @IpAddress)";
+                SqlCommand command = new SqlCommand(query, connection);
+                command.Parameters.AddWithValue("@logId", logId);
+                command.Parameters.AddWithValue("@Email", HttpUtility.HtmlEncode(email_TB.Text).ToLower().Trim());
+                command.Parameters.AddWithValue("@Timestamp", DateTime.Now);
+                command.Parameters.AddWithValue("@Type", type);
+                command.Parameters.AddWithValue("@IpAddress", GetIPAddress());
+
+                try
+                {
+                    command.Connection.Open();
+                    command.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(ex.ToString());
+                }
+                finally
+                {
+                    connection.Close();
+                }
+            }
+        }
+        protected string GetIPAddress()
+        {
+            string ip = System.Web.HttpContext.Current.Request.ServerVariables["HTTP_X_FORWARDED_FOR"];
+            if (string.IsNullOrEmpty(ip))
+            {
+                ip = System.Web.HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
+            }
+            return ip;
+        }
         protected void login_BTN_Click1(object sender, EventArgs e)
         {
 
@@ -135,6 +172,7 @@ namespace Application_Security_Assignment
 
                                             lblError.Text = "You account is locked out, please try again later";
                                             lblError.ForeColor = System.Drawing.Color.Red;
+                                            logFailAttempt(6);
                                         }
                                         else if (DateTime.Compare(DateTime.Now, lockoutTimeStamp) >= 0)
                                         {
@@ -298,6 +336,8 @@ namespace Application_Security_Assignment
                                 {
                                     //handle exception
                                 }
+                                logFailAttempt(2);
+
 
                             }
                             else
@@ -323,6 +363,8 @@ namespace Application_Security_Assignment
                                 lblError.Text = "Email or password is not valid. Account will be locked out in " + countbeforelockout + " more failed attempts";
                                 lblError.ForeColor = System.Drawing.Color.Red;
                                 //
+                                logFailAttempt(1);
+
                             }
                         }
                     }
@@ -331,11 +373,13 @@ namespace Application_Security_Assignment
                 {
                     lblError.Text = "Email or password is not valid. Please try again.";
                     lblError.ForeColor = System.Drawing.Color.Red;
+                    logFailAttempt(0);
                 };
             }
             else {
                 lblError.Text = "Captcha Failed, Please try again later";
                 lblError.ForeColor = System.Drawing.Color.Red;
+                logFailAttempt(5);
             }
         }
         protected int checkEmailIsVerified() {
@@ -379,7 +423,7 @@ namespace Application_Security_Assignment
 
             //To send a GET request to Google along with the response and Secret key.
             HttpWebRequest req = (HttpWebRequest)WebRequest.Create
-           ("https://www.google.com/recaptcha/api/siteverify?secret=6LfvYN4dAAAAAP81YNmTxPFQZ3DXNoEcH3cCA3hT &response=" + captchaResponse);
+           ("https://www.google.com/recaptcha/api/siteverify?secret=6LfvYN4dAAAAAP81YNmTxPFQZ3DXNoEcH3cCA3hT&response=" + captchaResponse);
             try
             {
 

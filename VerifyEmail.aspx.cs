@@ -94,6 +94,49 @@ namespace Application_Security_Assignment
             return h;
 
         }
+        protected void logFailAttempt() {
+            string logId = Guid.NewGuid().ToString();
+            using (var connection = new SqlConnection(MYDBConnectionString))
+            {
+                var query = "INSERT INTO Logs VALUES(@logId, @Email, @Timestamp, @Type, @IpAddress)";
+                SqlCommand command = new SqlCommand(query, connection);
+                command.Parameters.AddWithValue("@logId", logId);
+                command.Parameters.AddWithValue("@Email", HttpUtility.HtmlEncode(Session["VerifyingEmail"]));
+                command.Parameters.AddWithValue("@Timestamp", DateTime.Now);
+                command.Parameters.AddWithValue("@Type", 2);
+                command.Parameters.AddWithValue("@IpAddress", GetIPAddress());
+
+                try
+                {
+                    command.Connection.Open();
+                    command.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(ex.ToString());
+                }
+                finally
+                {
+                    connection.Close();
+                }
+            }
+        }
+        protected string GetIPAddress()
+        {
+            System.Web.HttpContext context = System.Web.HttpContext.Current;
+            string ipAddress = context.Request.ServerVariables["HTTP_X_FORWARDED_FOR"];
+
+            if (!string.IsNullOrEmpty(ipAddress))
+            {
+                string[] addresses = ipAddress.Split(',');
+                if (addresses.Length != 0)
+                {
+                    return addresses[0];
+                }
+            }
+
+            return context.Request.ServerVariables["REMOTE_ADDR"];
+        }
         protected void updateVerification() {
             using (var connection = new SqlConnection(MYDBConnectionString))
             {
